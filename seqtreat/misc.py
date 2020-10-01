@@ -1,6 +1,9 @@
 #! /usr/bin/env python
 
-def validate_column(column_name,value):
+import re, numpy
+from dateutil.parser import parse
+
+def validate_column(column_name,value,lookup_values):
     """Validates columns found in Seq&Treat tuberculosis AST donation spreadsheets.
 
     This function understands either the format of a passed column or uses values
@@ -16,17 +19,14 @@ def validate_column(column_name,value):
 
     # the SITEID must exist in the table
     if column_name=='site_id':
-        result=value in SITES.SITEID.unique()
+        result=value in lookup_values['SITES']
 
     # as must the COUNTRY code
     elif column_name=='country_where_sample_taken':
-        result=value in COUNTRIES.COUNTRY_CODE_3_LETTER.unique()
+        result=value in lookup_values['COUNTRIES']
 
     elif column_name=='instrument_model':
-        result=value in SEQUENCERS.instrument_model.unique()
-
-    elif column_name=='drug_method':
-        result=value in AST_METHODS.drug_method.unique()
+        result=value in lookup_values['SEQUENCERS']
 
     elif column_name=='isolate_number':
         try:
@@ -73,7 +73,7 @@ def validate_column(column_name,value):
             result=bool(re.match('^(E|D|S)RS[0-9]{6,}$',value))
 
     elif column_name=='method':
-        result=value in AST_METHODS.drug_method.unique()
+        result=value in lookup_values['AST_METHODS']
 
     elif column_name=='phenotype':
         result=value in ['R','S','U']

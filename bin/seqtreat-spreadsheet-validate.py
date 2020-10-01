@@ -2,16 +2,16 @@
 
 
 import argparse
-import pandas, re, numpy
-from dateutil.parser import parse
+import pandas
 
-from seqtreat_validation import validate_column
+
+import seqtreat
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--spreadsheet",default=None,required=True,help="the path to the Seq&Treat spreadsheet to validate")
-    parser.add_argument("--tables_path",default=None,required=True,help="the path to the Seq&Treat spreadsheet to validate")
+    parser.add_argument("--tables_path",default=None,required=True,help="the path to the folder containing SITES.csv, COUNTRIES_LOOKUP.csv etc (cryptic-tables/ will work)")
     options = parser.parse_args()
 
     # load the spreadsheet
@@ -20,10 +20,20 @@ if __name__ == "__main__":
     print("%30s : %s" % ("spreadsheet",options.spreadsheet))
     print()
 
+    lookup_values={}
+
     SITES=pandas.read_csv(options.tables_path+"/SITES.csv")
+    lookup_values['SITES']=SITES.SITEID.unique()
+
     COUNTRIES=pandas.read_csv(options.tables_path+"/COUNTRIES_LOOKUP.csv")
+    lookup_values['COUNTRIES']=COUNTRIES.COUNTRY_CODE_3_LETTER.unique()
+
     SEQUENCERS=pandas.read_csv(options.tables_path+"/SEQTREAT_SEQUENCERS.csv")
+    lookup_values['SEQUENCERS']=SEQUENCERS.instrument_model.unique()
+
     AST_METHODS=pandas.read_csv(options.tables_path+'/SEQTREAT_AST_METHODS.csv')
+    lookup_values['AST_METHODS']=AST_METHODS.drug_method.unique()
+
     DRUG=pandas.read_csv(options.tables_path+"/DRUG_LOOKUP.csv.gz")
 
     # first work out which drugs are ok and which are not
@@ -49,7 +59,7 @@ if __name__ == "__main__":
 
         for i in df[column_name]:
 
-            if validate_column(column_name,i):
+            if seqtreat.validate_column(column_name,i,lookup_values):
                 good_rows+=1
             else:
                 bad_rows+=1
@@ -88,7 +98,7 @@ if __name__ == "__main__":
 
             for i in df[drug_name+"_"+field_name]:
 
-                if validate_column(field_name,i):
+                if seqtreat.validate_column(field_name,i,lookup_values):
                     good_rows+=1
                 else:
                     bad_rows+=1

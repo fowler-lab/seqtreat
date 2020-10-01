@@ -1,5 +1,5 @@
 from setuptools import setup
-from gumpy import __version__
+from seqtreat import __version__
 
 setup(
     name='Seq&Treat data processing',
@@ -9,7 +9,6 @@ setup(
     description="Simple scripts and functions to validate and process genetic and AST data donated to the Seq&Treat project.",
     url="https://github.com/oxfordmmm/seqtreat",
     packages=['seqtreat'],
-    package_data={''},
     classifiers=[
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent"],
