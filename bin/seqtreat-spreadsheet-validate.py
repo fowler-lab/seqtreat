@@ -5,6 +5,8 @@ import argparse
 import pandas, re, numpy
 from dateutil.parser import parse
 
+from seqtreat_validation import validate_column
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -34,83 +36,6 @@ if __name__ == "__main__":
                 failed_drugs.append(drug)
             else:
                 drug_list.append(drug)
-
-
-    def validate_column(column_name,value):
-
-        # the SITEID must exist in the table
-        if column_name=='site_id':
-            result=value in SITES.SITEID.unique()
-
-        # as must the COUNTRY code
-        elif column_name=='country_where_sample_taken':
-            result=value in COUNTRIES.COUNTRY_CODE_3_LETTER.unique()
-
-        elif column_name=='instrument_model':
-            result=value in SEQUENCERS.instrument_model.unique()
-
-        elif column_name=='drug_method':
-            result=value in AST_METHODS.drug_method.unique()
-
-        elif column_name=='isolate_number':
-            try:
-                result=value>0
-            except:
-                result=False
-
-        elif column_name=='sequence_replicate_number':
-            result=bool(re.match('^[_0-9]+$',str(value)))
-
-        elif column_name in ['dataset_name','lab_id','subject_id']:
-            result=bool(re.match('^[_\-A-Za-z0-9]+$',str(value)))
-
-        elif column_name in ['collection_date','submission_date']:
-            try:
-                result=bool(parse(value))
-            except:
-                result=False
-
-        elif column_name=='reads_file_1':
-            result=bool(re.match('^[\-_A-Za-z0-9]+_R1.fastq.gz$',str(value)))
-
-        elif column_name=='reads_file_2':
-            result=bool(re.match('^[\-_A-Za-z0-9]+_R2.fastq.gz$',str(value)))
-
-        elif column_name in ['reads_file_1_md5','reads_file_2_md5']:
-            result=bool(re.match('^[a-z0-9]+$',str(value)))
-
-        elif column_name in ['ena_deposited']:
-            result=value in [True,False]
-
-        elif column_name in ['ena_run_accession']:
-            result=False
-            if isinstance(value,float) and numpy.isnan(value):
-                result=True
-            elif isinstance(value,str):
-                result=bool(re.match('^(E|D|S)RR[0-9]{6,}$',value))
-
-        elif column_name in ['ena_sample_accession']:
-            result=False
-            if isinstance(value,float) and numpy.isnan(value):
-                result=True
-            elif isinstance(value,str):
-                result=bool(re.match('^(E|D|S)RS[0-9]{6,}$',value))
-
-        elif column_name=='method':
-            result=value in AST_METHODS.drug_method.unique()
-
-        elif column_name=='phenotype':
-            result=value in ['R','S','U']
-
-        elif column_name=='cc':
-            result=False
-            if isinstance(value,str):
-                result=value in ['WHO','UK']
-            elif isinstance(value,float):
-                result=value>0
-
-        return result
-
 
 
 
