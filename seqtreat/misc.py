@@ -84,5 +84,8 @@ def validate_column(column_name,value,lookup_values):
             result=value in ['WHO','UK']
         elif isinstance(value,float):
             result=value>0
+        elif isinstance(value,int):
+            result=value>0
+
 
     return result

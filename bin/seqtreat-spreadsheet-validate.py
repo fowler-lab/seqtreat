@@ -34,7 +34,7 @@ if __name__ == "__main__":
     AST_METHODS=pandas.read_csv(options.tables_path+'/SEQTREAT_AST_METHODS.csv')
     lookup_values['AST_METHODS']=AST_METHODS.drug_method.unique()
 
-    DRUG=pandas.read_csv(options.tables_path+"/DRUG_LOOKUP.csv.gz")
+    DRUG=pandas.read_csv(options.tables_path+"/DRUG_CODES.csv")
 
     # first work out which drugs are ok and which are not
     drug_list=[]
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     for i in df.columns:
         if 'method' in i:
             drug=i[:3]
-            if drug.upper() not in DRUG.DRUG_ABBREVATION.unique():
+            if drug.upper() not in DRUG.DRUG_3_LETTER_CODE.unique():
                 failed_drugs.append(drug)
             else:
                 drug_list.append(drug)
