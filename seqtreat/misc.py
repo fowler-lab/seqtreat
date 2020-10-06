@@ -2,6 +2,7 @@
 
 import re, numpy
 from dateutil.parser import parse
+import datetime
 
 def validate_column(column_name,value,lookup_values):
     """Validates columns found in Seq&Treat tuberculosis AST donation spreadsheets.
@@ -41,10 +42,12 @@ def validate_column(column_name,value,lookup_values):
         result=bool(re.match('^[_\-A-Za-z0-9]+$',str(value)))
 
     elif column_name in ['collection_date','submission_date']:
-        try:
-            result=bool(parse(value))
-        except:
-            result=False
+        # this will catch nans
+        if value!=value:
+            result=True
+        # otherwise the pandas date converters will have picked it up
+        else:
+            result=isinstance(value,datetime.datetime)
 
     elif column_name=='reads_file_1':
         result=bool(re.match('^[\-_A-Za-z0-9]+_R1.fastq.gz$',str(value)))

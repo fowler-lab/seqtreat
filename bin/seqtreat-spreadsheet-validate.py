@@ -15,7 +15,7 @@ if __name__ == "__main__":
     options = parser.parse_args()
 
     # load the spreadsheet
-    df=pandas.read_excel(options.spreadsheet)
+    df=pandas.read_excel(options.spreadsheet, dtype={'site_id':'object','collection_date':'object'})
 
     print("%30s : %s" % ("spreadsheet",options.spreadsheet))
     print()
