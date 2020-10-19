@@ -86,9 +86,9 @@ if __name__ == "__main__":
 
     for drug_name in drug_list:
 
-        assert drug_name+"_method" in df.columns
-        assert drug_name+"_cc" in df.columns
-        assert drug_name+"_phenotype" in df.columns
+        assert drug_name+"_method" in df.columns, drug_name+"_method not in columns"
+        assert drug_name+"_cc" in df.columns, drug_name+"_cc not in columns"
+        assert drug_name+"_phenotype" in df.columns, drug_name+"_phenotype not in columns"
 
         for field_name in ['method','phenotype','cc']:
 
