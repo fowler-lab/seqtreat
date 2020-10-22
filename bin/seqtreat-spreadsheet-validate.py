@@ -3,7 +3,7 @@
 
 import argparse, os
 
-import pandas
+import pandas, numpy
 
 import seqtreat
 
@@ -20,7 +20,6 @@ if __name__ == "__main__":
     filestem=os.path.splitext(options.spreadsheet)[0]
 
     print("%30s : %s" % ("spreadsheet",options.spreadsheet))
-    print()
 
     lookup_values={}
 
@@ -45,9 +44,11 @@ if __name__ == "__main__":
         if 'method' in i:
             drug=i[:3]
             if drug.upper() not in DRUG.DRUG_3_LETTER_CODE.unique():
-                failed_drugs.append(drug)
+                if drug not in failed_drugs:
+                    failed_drugs.append(drug)
             else:
-                drug_list.append(drug)
+                if drug not in drug_list:
+                    drug_list.append(drug)
 
     spreadsheet_pass=True
 
@@ -68,9 +69,7 @@ if __name__ == "__main__":
                 if i not in bad_values:
                     bad_values.append(i)
 
-        if bad_rows==0:
-            message="All rows pass validation"
-        else:
+        if bad_rows>0:
             spreadsheet_pass=False
             if len(bad_values)==1:
                 message=str(good_rows)+ " rows which pass validation and "+str(bad_rows)+ " which fail validation. All failing values due to: "+str(bad_values[0])
@@ -81,51 +80,72 @@ if __name__ == "__main__":
             else:
                 message=str(good_rows)+ " rows which pass validation and "+str(bad_rows)+ " which fail validation. Number unique: "+str(len(bad_values))+ ". Example failing values: "+str(bad_values[0])+", "+str(bad_values[1])+", "+str(bad_values[2])
 
-        print("%30s : %s" % (column_name,message))
+            print("%30s : %s" % (column_name,message))
 
     for drug_name in failed_drugs:
         print("%30s : %s" % (drug_name,"drug not recognised, please check"))
         spreadsheet_pass=False
 
+    drug_lookup={}
+
     for drug_name in drug_list:
 
-        assert drug_name+"_method" in donated_spreadsheet.columns, drug_name+"_method not in columns"
-        assert drug_name+"_cc" in donated_spreadsheet.columns, drug_name+"_cc not in columns"
-        assert drug_name+"_phenotype" in donated_spreadsheet.columns, drug_name+"_phenotype not in columns"
+        measurements=[]
+        if drug_name+"_method_1" in donated_spreadsheet.columns:
+            for i in range(10):
+                if drug_name+"_method_"+str(i) in donated_spreadsheet.columns:
+                    measurements.append(str(i))
 
-        for field_name in ['method','phenotype','cc']:
+        if not measurements:
+            assert drug_name+"_method" in donated_spreadsheet.columns, drug_name+"_method not in columns"
+            assert drug_name+"_cc" in donated_spreadsheet.columns, drug_name+"_cc not in columns"
+            assert drug_name+"_phenotype" in donated_spreadsheet.columns, drug_name+"_phenotype not in columns"
+            measurements.append(None)
+        else:
+            for i in measurements:
+                assert drug_name+"_method_"+i in donated_spreadsheet.columns, drug_name+"_method not in columns"
+                assert drug_name+"_cc_"+i in donated_spreadsheet.columns, drug_name+"_cc not in columns"
+                assert drug_name+"_phenotype_"+i in donated_spreadsheet.columns, drug_name+"_phenotype_"+i+" not in columns"
 
-            good_rows=0
-            bad_rows=0
-            bad_values=[]
+        drug_lookup[drug_name]=measurements
 
-            for i in donated_spreadsheet[drug_name+"_"+field_name]:
+        for n_measurement in measurements:
 
-                if seqtreat.validate_column(field_name,i,lookup_values):
-                    good_rows+=1
+            for field_name in ['method','phenotype','cc']:
+
+                if n_measurement is None:
+                    column_name = drug_name+"_"+field_name
                 else:
-                    bad_rows+=1
-                    if i not in bad_values:
-                        bad_values.append(i)
+                    column_name = drug_name+"_"+field_name+"_"+n_measurement
 
-            column_name=drug_name+"_"+field_name
-            if bad_rows==0:
-                message="All rows pass validation"
-            else:
-                spreadsheet_pass=False
-                if len(bad_values)==1:
-                    message=str(good_rows)+ " rows which pass validation and "+str(bad_rows)+ " which fail validation. All failing values due to: "+str(bad_values[0])
-                elif len(bad_values)==2:
-                    message=str(good_rows)+ " rows which pass validation and "+str(bad_rows)+ " which fail validation. All failing values due to: "+str(bad_values[0])+", "+str(bad_values[1])
-                elif len(bad_values)==3:
-                    message=str(good_rows)+ " rows which pass validation and "+str(bad_rows)+ " which fail validation. All failing values due to: "+str(bad_values[0])+", "+str(bad_values[1])+", "+str(bad_values[2])
-                else:
-                    message=str(good_rows)+ " rows which pass validation and "+str(bad_rows)+ " which fail validation. Number unique: "+str(len(bad_values))+ ". Example failing values: "+str(bad_values[0])+", "+str(bad_values[1])+", "+str(bad_values[2])
+                good_rows=0
+                bad_rows=0
+                bad_values=[]
 
-            print("%30s : %s" % (column_name,message))
+                for i in donated_spreadsheet[column_name]:
+
+                    if seqtreat.validate_column(field_name,i,lookup_values):
+                        good_rows+=1
+                    else:
+                        bad_rows+=1
+                        if i not in bad_values:
+                            bad_values.append(i)
+
+                if bad_rows>0:
+                    spreadsheet_pass=False
+                    if len(bad_values)==1:
+                        message=str(good_rows)+ " rows which pass validation and "+str(bad_rows)+ " which fail validation. All failing values due to: "+str(bad_values[0])
+                    elif len(bad_values)==2:
+                        message=str(good_rows)+ " rows which pass validation and "+str(bad_rows)+ " which fail validation. All failing values due to: "+str(bad_values[0])+", "+str(bad_values[1])
+                    elif len(bad_values)==3:
+                        message=str(good_rows)+ " rows which pass validation and "+str(bad_rows)+ " which fail validation. All failing values due to: "+str(bad_values[0])+", "+str(bad_values[1])+", "+str(bad_values[2])
+                    else:
+                        message=str(good_rows)+ " rows which pass validation and "+str(bad_rows)+ " which fail validation. Number unique: "+str(len(bad_values))+ ". Example failing values: "+str(bad_values[0])+", "+str(bad_values[1])+", "+str(bad_values[2])
+
+                    print("%30s : %s" % (column_name,message))
 
     if not spreadsheet_pass:
-        print("Spreadsheet DOES NOT PASS validation - please fix reported errors and repeat")
+        print("Spreadsheet FAILS validation - please fix reported errors and repeat")
     else:
         print("Spreadsheet PASSES validation!")
 
@@ -133,31 +153,58 @@ if __name__ == "__main__":
 
         for (idx,row) in donated_spreadsheet.iterrows():
 
-            for drug in drug_list:
+            for drug in drug_lookup:
 
-                if row[drug+"_phenotype"] in ['S','R','U']:
+                for n_measurement in drug_lookup[drug]:
 
-                    drug_name=drug.upper()
+                    if n_measurement is None:
+                        method_field=drug+"_method"
+                        cc_field=drug+"_cc"
+                        phenotype_field=drug+"_phenotype"
+                    else:
+                        method_field=drug+"_method_"+str(n_measurement)
+                        cc_field=drug+"_cc_"+str(n_measurement)
+                        phenotype_field=drug+"_phenotype_"+str(n_measurement)
 
-                    df=AST_METHODS[AST_METHODS.DRUG_METHOD==row[drug+"_method"]]
+                    if isinstance(row[method_field],float) and numpy.isnan(row[method_field]):
+                        break
 
-                    new_row={}
+                    if row[method_field][:3]=='MIC':
+                        phenotype_mic=True
+                    elif row[method_field][:2]=='CC':
+                        phenotype_mic=False
+                    else:
+                        raise ValueError("what is going on with "+method_field)
 
-                    assert len(df)==1
-                    new_row['UNIQUEID']='site.'+str(row['site_id'])+'.subj.'+str(row['subject_id'])+'.lab.'+str(row['lab_id'])+'.iso.'+str(row['isolate_number'])
-                    new_row['DRUG'] = drug_name
-                    new_row['METHOD_1']=df['METHOD_1'].values[0]
-                    new_row['METHOD_2']=df['METHOD_2'].values[0]
-                    new_row['METHOD_3']=df['METHOD_3'].values[0]
-                    new_row['METHOD_CC']=row[drug+"_cc"]
-                    new_row['METHOD_MIC']=''
-                    new_row['PHENOTYPE']=row[drug+'_phenotype']
+                    if phenotype_mic or row[phenotype_field] in ['S','R','U']:
+
+                        drug_name=drug.upper()
+
+                        df=AST_METHODS[AST_METHODS.DRUG_METHOD==row[method_field]]
+
+                        new_row={}
+
+                        assert len(df)==1
+                        new_row['UNIQUEID']='site.'+str(row['site_id'])+'.subj.'+str(row['subject_id'])+'.lab.'+str(row['lab_id'])+'.iso.'+str(row['isolate_number'])
+                        new_row['DRUG'] = drug_name
+                        new_row['METHOD_1']=df['METHOD_1'].values[0]
+                        new_row['METHOD_2']=df['METHOD_2'].values[0]
+                        new_row['METHOD_3']=df['METHOD_3'].values[0]
+                        new_row['METHOD_CC']=row[cc_field]
+                        if phenotype_mic:
+                            new_row['METHOD_MIC']=row[phenotype_field]
+                            new_row['PHENOTYPE']=''
+                        else:
+                            new_row['METHOD_MIC']=''
+                            new_row['PHENOTYPE']=row[phenotype_field]
+
                     # df=df[['UNIQUEID','DRUG','METHOD_1','METHOD_2','METHOD_3','METHOD_CC','METHOD_MIC','PHENOTYPE']]
                     new_table_rows.append(new_row)
 
         df=pandas.DataFrame(new_table_rows)
 
         if not os.path.isfile(filestem+"_DST_MEASUREMENTS.csv"):
+            print("SAVING foo_DST_MEASUREMENTS.csv!")
             df.to_csv(filestem+"_DST_MEASUREMENTS.csv")
         else:
-            print("File already exists! Not saving...")
+            print("File already EXISTS! Not saving...")

@@ -20,7 +20,7 @@ def validate_column(column_name,value,lookup_values):
 
     # the SITEID must exist in the table
     if column_name=='site_id':
-        result=value in lookup_values['SITES']
+        result=str(value) in lookup_values['SITES']
 
     # as must the COUNTRY code
     elif column_name=='country_where_sample_taken':
@@ -76,17 +76,50 @@ def validate_column(column_name,value,lookup_values):
             result=bool(re.match('^(E|D|S)RS[0-9]{6,}$',value))
 
     elif column_name=='method':
-        result=value in lookup_values['AST_METHODS']
+        if isinstance(value,float) and numpy.isnan(value):
+            result=True
+        else:
+            result=value in lookup_values['AST_METHODS']
 
     elif column_name=='phenotype':
-        result=value in ['R','S','U']
+        if isinstance(value,float):
+            if numpy.isnan(value):
+                result=True
+            else:
+                result=value>0
+        elif isinstance(value,str):
+            if value in ['R','S','U']:
+                return True
+            else:
+                if ',' in value:
+                    value=value.replace(',','.')
+                if value[0]=='>':
+                    try:
+                        result=float(value[1:])>0
+                    except:
+                        result=False
+                elif value[:2]=='<=':
+                    try:
+                        result=float(value[2:])>0
+                    except:
+                        result=False
+                else:
+                    try:
+                        result=float(value)>0
+                    except:
+                        result=False
+        else:
+            result=value>0
 
     elif column_name=='cc':
         result=False
         if isinstance(value,str):
             result=value in ['WHO','UK']
         elif isinstance(value,float):
-            result=value>0
+            if numpy.isnan(value):
+                return(True)
+            else:
+                result=value>0
         elif isinstance(value,int):
             result=value>0
 
