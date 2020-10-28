@@ -39,7 +39,10 @@ def validate_column(column_name,value,lookup_values):
         result=bool(re.match('^[_0-9]+$',str(value)))
 
     elif column_name in ['dataset_name','lab_id','subject_id']:
-        result=bool(re.match('^[_\-A-Za-z0-9]+$',str(value)))
+        if 'nan' in str(value):
+            return(False)
+        else:
+            result=bool(re.match('^[_\-A-Za-z0-9]+$',str(value)))
 
     elif column_name in ['collection_date','submission_date']:
         # this will catch nans
@@ -68,12 +71,13 @@ def validate_column(column_name,value,lookup_values):
         elif isinstance(value,str):
             result=bool(re.match('^(E|D|S)RR[0-9]{6,}$',value))
 
+
     elif column_name in ['ena_sample_accession']:
         result=False
         if isinstance(value,float) and numpy.isnan(value):
             result=True
         elif isinstance(value,str):
-            result=bool(re.match('^(E|D|S)RS[0-9]{6,}$',value))
+            result=bool(re.match('^(E|D|S)RS[0-9]{6,}$',value)) or bool(value[:5]=='SAMEA')
 
     elif column_name=='method':
         if isinstance(value,float) and numpy.isnan(value):
@@ -93,7 +97,20 @@ def validate_column(column_name,value,lookup_values):
             else:
                 if ',' in value:
                     value=value.replace(',','.')
-                if value[0]=='>':
+                if '≥' in value:
+                    value=value.replace('≥','>=')
+                if '≤' in value:
+                    value=value.replace('≤','<=')
+                if ' ' in value:
+                    value=value.replace(' ','')
+
+                # FIXME: hack to allow through incorrect >=32 MICs (should be >32)
+                if value[:2]=='>=':
+                    try:
+                        result=float(value[2:])>0
+                    except:
+                        result=False
+                elif value[0]=='>':
                     try:
                         result=float(value[1:])>0
                     except:
@@ -101,6 +118,12 @@ def validate_column(column_name,value,lookup_values):
                 elif value[:2]=='<=':
                     try:
                         result=float(value[2:])>0
+                    except:
+                        result=False
+                # FIXME: hack to allow through incorrect <0.06 MICs (should be <=0.06)
+                elif value[0]=='<':
+                    try:
+                        result=float(value[1:])>0
                     except:
                         result=False
                 else:

@@ -1,7 +1,7 @@
 #! /usr/bin/python
 
 
-import argparse, os
+import argparse, os, json, datetime
 
 import pandas, numpy
 
@@ -15,7 +15,7 @@ if __name__ == "__main__":
     options = parser.parse_args()
 
     # load the spreadsheet
-    donated_spreadsheet=pandas.read_excel(options.spreadsheet, dtype={'site_id':'object','collection_date':'object'})
+    donated_spreadsheet=pandas.read_excel(options.spreadsheet, dtype={'site_id':'object','lab_id':'object'})
 
     filestem=os.path.splitext(options.spreadsheet)[0]
 
@@ -69,7 +69,8 @@ if __name__ == "__main__":
                 if i not in bad_values:
                     bad_values.append(i)
 
-        if bad_rows>0:
+        # FIXME: temporarily allow through problems with the read_files!
+        if bad_rows>0 and column_name not in ['reads_file_1','reads_file_2']:
             spreadsheet_pass=False
             if len(bad_values)==1:
                 message=str(good_rows)+ " rows which pass validation and "+str(bad_rows)+ " which fail validation. All failing values due to: "+str(bad_values[0])
@@ -147,11 +148,49 @@ if __name__ == "__main__":
     if not spreadsheet_pass:
         print("Spreadsheet FAILS validation - please fix reported errors and repeat")
     else:
-        print("Spreadsheet PASSES validation!")
+        print("Spreadsheet PASSES validation with "+str(good_rows)+" rows!")
 
-        new_table_rows=[]
+        new_measurement_rows=[]
+        new_sample_rows=[]
 
         for (idx,row) in donated_spreadsheet.iterrows():
+
+            uid='site.'+str(row['site_id'])+'.subj.'+str(row['subject_id']).upper()+'.lab.'+str(row['lab_id']).upper()+'.iso.'+str(row['isolate_number'])
+
+            sample_row={}
+            sample_row['UNIQUEID']=uid
+            sample_row['SOURCE']='SEQTREAT2020'
+            sample_row['COUNTRY_NAME']=row['country_where_sample_taken']
+
+            other={}
+            other['SOURCE_SPREADSHEET']=filestem
+            if row['dataset_name']:
+                other['DATASET_NAME']=row['dataset_name']
+            if isinstance(row['collection_date'],datetime.datetime):
+                other['COLLECTION_DATE']=row['collection_date'].__str__()
+            if isinstance(row['submission_date'],datetime.datetime):
+                other['SUBMISSION_DATE']=row['submission_date'].__str__()
+            if row['ena_deposited']:
+                other['ENA_DEPOSITED']=row['ena_deposited']
+            # checking that it must be a populated string weeds out any blanks or nans
+            if isinstance(row['reads_file_1'],str) and row['reads_file_1']:
+                other['READS_FILE_1']=row['reads_file_1']
+            if isinstance(row['reads_file_2'],str) and row['reads_file_2']:
+                other['READS_FILE_2']=row['reads_file_2']
+            if isinstance(row['reads_file_1_md5'],str) and row['reads_file_1_md5']:
+                other['READS_FILE_1_MD5']=row['reads_file_1_md5']
+            if isinstance(row['reads_file_2_md5'],str) and row['reads_file_2_md5'] :
+                other['READS_FILE_2_MD5']=row['reads_file_2_md5']
+            if isinstance(row['instrument_model'],str) and row['instrument_model']:
+                other['SEQUENCER_MODEL']=row['instrument_model']
+            if isinstance(row['ena_run_accession'],str) and row['ena_run_accession']:
+                other['ENA_RUN_ACCESSION']=row['ena_run_accession']
+            if isinstance(row['ena_sample_accession'],str) and row['ena_sample_accession']:
+                other['ENA_RUN_ACCESSION']=row['ena_sample_accession']
+
+            sample_row['OTHER']=json.dumps(other)
+
+            new_sample_rows.append(sample_row)
 
             for drug in drug_lookup:
 
@@ -169,12 +208,18 @@ if __name__ == "__main__":
                     if isinstance(row[method_field],float) and numpy.isnan(row[method_field]):
                         break
 
-                    if row[method_field][:3]=='MIC':
+                    # hack to bypass HAIN and XPERT methods which are not in AST_METHODS
+                    if row[method_field] in ['HAIN','XPERT','not_specified']:
+                        phenotype_mic=False
+                    elif row[method_field]=='MODS':
+                        phenotype_mic=True
+                    elif row[method_field][:3]=='MIC':
                         phenotype_mic=True
                     elif row[method_field][:2]=='CC':
                         phenotype_mic=False
                     else:
-                        raise ValueError("what is going on with "+method_field)
+                        print(row)
+                        raise ValueError("what is going on with "+method_field+' '+row[method_field])
 
                     if phenotype_mic or row[phenotype_field] in ['S','R','U']:
 
@@ -182,29 +227,44 @@ if __name__ == "__main__":
 
                         df=AST_METHODS[AST_METHODS.DRUG_METHOD==row[method_field]]
 
-                        new_row={}
+                        measurement_row={}
 
                         assert len(df)==1
-                        new_row['UNIQUEID']='site.'+str(row['site_id'])+'.subj.'+str(row['subject_id'])+'.lab.'+str(row['lab_id'])+'.iso.'+str(row['isolate_number'])
-                        new_row['DRUG'] = drug_name
-                        new_row['METHOD_1']=df['METHOD_1'].values[0]
-                        new_row['METHOD_2']=df['METHOD_2'].values[0]
-                        new_row['METHOD_3']=df['METHOD_3'].values[0]
-                        new_row['METHOD_CC']=row[cc_field]
+                        measurement_row['UNIQUEID']=uid
+                        measurement_row['DRUG'] = drug_name
+                        measurement_row['METHOD_1']=df['METHOD_1'].values[0]
+                        measurement_row['METHOD_2']=df['METHOD_2'].values[0]
+                        measurement_row['METHOD_3']=df['METHOD_3'].values[0]
+                        measurement_row['METHOD_CC']=row[cc_field]
                         if phenotype_mic:
-                            new_row['METHOD_MIC']=row[phenotype_field]
-                            new_row['PHENOTYPE']=''
+
+                            # this is to cater for when it is a plate but they've put an R/S/U in the phenotype rather than an MIC
+                            if row[phenotype_field] in ['R','S','U']:
+                                measurement_row['METHOD_MIC']=''
+                                measurement_row['PHENOTYPE']=row[phenotype_field]
+                            else:
+                                measurement_row['METHOD_MIC']=row[phenotype_field]
+                                measurement_row['PHENOTYPE']=''
                         else:
-                            new_row['METHOD_MIC']=''
-                            new_row['PHENOTYPE']=row[phenotype_field]
+                            measurement_row['METHOD_MIC']=''
+                            measurement_row['PHENOTYPE']=row[phenotype_field]
 
                     # df=df[['UNIQUEID','DRUG','METHOD_1','METHOD_2','METHOD_3','METHOD_CC','METHOD_MIC','PHENOTYPE']]
-                    new_table_rows.append(new_row)
+                    new_measurement_rows.append(measurement_row)
 
-        df=pandas.DataFrame(new_table_rows)
+
+        df=pandas.DataFrame(new_measurement_rows)
 
         if not os.path.isfile(filestem+"_DST_MEASUREMENTS.csv"):
-            print("SAVING foo_DST_MEASUREMENTS.csv!")
+            print("SAVING "+filestem+"_DST_MEASUREMENTS.csv")
             df.to_csv(filestem+"_DST_MEASUREMENTS.csv")
         else:
-            print("File already EXISTS! Not saving...")
+            print(filestem+"_DST_MEASUREMENTS.csv already EXISTS! Not saving...")
+
+        df=pandas.DataFrame(new_sample_rows)
+
+        if not os.path.isfile(filestem+"_DST_SAMPLES.csv"):
+            print("SAVING "+filestem+"_DST_SAMPLES.csv")
+            df.to_csv(filestem+"_DST_SAMPLES.csv")
+        else:
+            print(filestem+"_DST_SAMPLES.csv already EXISTS! Not saving...")
